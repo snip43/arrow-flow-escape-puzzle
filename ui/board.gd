@@ -4,8 +4,6 @@ signal tapped(id: String)
 
 const Tap := preload("res://game/tap_tracker.gd")
 const Model := preload("res://game/board_model.gd")
-const INK := Color("#a7f2dd")
-const DENIED := Color("#ff796e")
 var model: Model
 var tap := Tap.new()
 var locked := false
@@ -98,10 +96,10 @@ func _draw() -> void:
 		return
 	var s := spacing()
 	var field := Rect2(center(Vector2i.ZERO) - Vector2.ONE * s * 0.5, Vector2(model.size) * s)
-	draw_rect(field.grow(s * 0.12), Color("#172f3a"))
+	var dot := get_theme_color("dot","Flow")
 	for x in model.size.x:
 		for y in model.size.y:
-			draw_circle(center(Vector2i(x,y)), s * 0.034, Color("#49616a"), true, -1, true)
+			draw_circle(center(Vector2i(x,y)), s * 0.028, dot, true, -1, true)
 	clip.position = field.position
 	clip.size = field.size
 	ink.position = -field.position
@@ -113,7 +111,8 @@ func draw_arrows() -> void:
 		var path := PackedVector2Array(model.path_for(id))
 		if exiting == id:
 			path = motion.section(distance)
-		var color := DENIED if flashed == id else INK
+		var color := get_theme_color("coral" if flashed == id else "mint","Flow")
+		var stroke := s * (0.165 if flashed == id else 0.138)
 		var head := center(path[-1])
 		var axis := (head - center(path[-2])).normalized()
 		var side := axis.orthogonal()
@@ -122,7 +121,7 @@ func draw_arrows() -> void:
 			var end := center(path[i+1])
 			if i == path.size()-2:
 				end -= axis * minf(s * 0.13, point.distance_to(end))
-			ink.draw_line(point, end, color, s * 0.13, true)
-			ink.draw_circle(point, s * 0.065, color, true, -1, true)
-		var base := head - axis * s * 0.19
-		ink.draw_colored_polygon(PackedVector2Array([head + axis*s*0.18, base+side*s*0.20, base-side*s*0.20]), color)
+			ink.draw_line(point, end, color, stroke, true)
+			ink.draw_circle(point, stroke * 0.5, color, true, -1, true)
+		var base := head - axis * s * 0.21
+		ink.draw_colored_polygon(PackedVector2Array([head + axis*s*0.22, base+side*s*0.215, base-side*s*0.215]), color)

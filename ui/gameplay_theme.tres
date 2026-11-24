@@ -1,0 +1,106 @@
+[gd_resource type="Theme" load_steps=10 format=3]
+
+[sub_resource type="StyleBoxFlat" id="secondary"]
+bg_color = Color(0.129412, 0.211765, 0.254902, 1)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_left = 45
+corner_radius_bottom_right = 45
+
+[sub_resource type="StyleBoxFlat" id="hover"]
+bg_color = Color(0.172549, 0.27451, 0.321569, 1)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_left = 45
+corner_radius_bottom_right = 45
+
+[sub_resource type="StyleBoxFlat" id="down"]
+bg_color = Color(0.098039, 0.172549, 0.215686, 1)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_left = 45
+corner_radius_bottom_right = 45
+
+[sub_resource type="StyleBoxFlat" id="primary"]
+bg_color = Color(0.54902, 0.913725, 0.811765, 1)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_left = 45
+corner_radius_bottom_right = 45
+
+[sub_resource type="StyleBoxFlat" id="primary_hover"]
+bg_color = Color(0.67451, 0.956863, 0.87451, 1)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_left = 45
+corner_radius_bottom_right = 45
+
+[sub_resource type="StyleBoxFlat" id="primary_down"]
+bg_color = Color(0.4, 0.811765, 0.705882, 1)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_left = 45
+corner_radius_bottom_right = 45
+
+[sub_resource type="StyleBoxFlat" id="track"]
+bg_color = Color(0.188235, 0.270588, 0.305882, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 5
+
+[sub_resource type="StyleBoxFlat" id="fill"]
+bg_color = Color(0.333333, 0.85098, 0.72549, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 5
+
+[sub_resource type="StyleBoxFlat" id="focus"]
+bg_color = Color(0.062745, 0.113725, 0.152941, 1)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_left = 45
+corner_radius_bottom_right = 45
+draw_center = false
+border_color = Color(0.654902, 0.94902, 0.866667, 1)
+border_width_left = 5
+border_width_right = 5
+border_width_top = 5
+border_width_bottom = 5
+
+[resource]
+Caption/base_type = &"Label"
+Wordmark/base_type = &"Label"
+Caption/colors/font_color = Color(0.670588, 0.756863, 0.768627, 1)
+Wordmark/colors/font_color = Color(0.333333, 0.85098, 0.72549, 1)
+default_font_size = 40
+Primary/base_type = &"Button"
+Flow/colors/paper = Color(0.945098, 0.972549, 0.968627, 1)
+Flow/colors/muted = Color(0.670588, 0.756863, 0.768627, 1)
+Flow/colors/bg = Color(0.062745, 0.113725, 0.152941, 1)
+Flow/colors/mint = Color(0.654902, 0.94902, 0.866667, 1)
+Flow/colors/accent = Color(0.333333, 0.85098, 0.72549, 1)
+Flow/colors/coral = Color(1.0, 0.47451, 0.431373, 1)
+Flow/colors/dot = Color(0.196078, 0.27451, 0.313725, 1)
+Button/colors/font_color = Color(0.945098, 0.972549, 0.968627, 1)
+Button/colors/font_hover_color = Color(0.945098, 0.972549, 0.968627, 1)
+Button/colors/font_pressed_color = Color(0.945098, 0.972549, 0.968627, 1)
+Button/colors/font_focus_color = Color(0.945098, 0.972549, 0.968627, 1)
+Button/colors/font_hover_pressed_color = Color(0.945098, 0.972549, 0.968627, 1)
+Button/styles/normal = SubResource("secondary")
+Button/styles/hover = SubResource("hover")
+Button/styles/pressed = SubResource("down")
+Button/styles/focus = SubResource("focus")
+Primary/colors/font_color = Color(0.062745, 0.113725, 0.152941, 1)
+Primary/colors/font_hover_color = Color(0.062745, 0.113725, 0.152941, 1)
+Primary/colors/font_pressed_color = Color(0.062745, 0.113725, 0.152941, 1)
+Primary/colors/font_focus_color = Color(0.062745, 0.113725, 0.152941, 1)
+Primary/colors/font_hover_pressed_color = Color(0.062745, 0.113725, 0.152941, 1)
+Primary/styles/normal = SubResource("primary")
+Primary/styles/hover = SubResource("primary_hover")
+Primary/styles/pressed = SubResource("primary_down")
+Primary/styles/focus = SubResource("focus")
+Label/colors/font_color = Color(0.945098, 0.972549, 0.968627, 1)
+ProgressBar/styles/background = SubResource("track")
+ProgressBar/styles/fill = SubResource("fill")

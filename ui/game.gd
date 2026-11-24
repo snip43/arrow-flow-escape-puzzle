@@ -8,6 +8,7 @@ var model := Model.new()
 const SPEED := 25.0 # cells per second
 var catalog := preload("res://levels/level_catalog.gd").new()
 var level_id := 1
+var total := 0
 var generation := 0
 var animation: Tween
 
@@ -15,6 +16,8 @@ func _ready() -> void:
 	board.tapped.connect(move)
 	%Restart.pressed.connect(restart)
 	%Next.pressed.connect(next_level)
+	resized.connect(update_safe_margins)
+	update_safe_margins()
 	restart()
 
 func next_level() -> void:
@@ -37,7 +40,13 @@ func load_level(id: int) -> bool:
 		animation.kill()
 	board.reset_visuals()
 	board.model = model
-	$Layout/Level.text = "LEVEL %d · %s" % [id,data.tier.to_upper()]
+	total = model.ids().size()
+	update_progress()
+	$Layout/Level.text = "LEVEL %d" % id
+	$Layout/Tier.text = data.tier
+	$Layout/Tutorial.visible = id == 1
+	$Layout/Overlay.hide()
+	board.set_process_input(true)
 	complete.text = "ALL LEVELS COMPLETE" if id == 100 else "LEVEL COMPLETE"
 	complete.visible = false
 	%Next.visible = false
@@ -64,5 +73,28 @@ func finish_move(id: String, ticket: int) -> void:
 	board.reset_visuals(false)
 	complete.visible = removed and model.ids().is_empty()
 	%Next.visible = complete.visible and level_id < 100
+	if removed:
+		update_progress()
+	if complete.visible:
+		board.tap.clear()
+		board.set_process_input(false)
+		$Layout/Tutorial.hide()
+		$Layout/Overlay.show()
 	if not removed:
 		push_error("Could not commit exit: " + id)
+
+func update_progress() -> void:
+	var cleared := total - model.ids().size()
+	$Layout/Count.text = "%d / %d cleared" % [cleared,total]
+	$Layout/Track.max_value = total
+	$Layout/Track.value = cleared
+
+func update_safe_margins() -> void:
+	if not OS.has_feature("mobile"):
+		return
+	var safe := DisplayServer.get_display_safe_area()
+	var local := get_screen_transform().affine_inverse() * Rect2(safe)
+	$Layout.offset_left = maxf(48, local.position.x)
+	$Layout.offset_top = maxf(44, local.position.y)
+	$Layout.offset_right = -maxf(48, size.x-local.end.x)
+	$Layout.offset_bottom = -maxf(44, size.y-local.end.y)

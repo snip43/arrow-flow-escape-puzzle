@@ -1,59 +1,160 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://ui/game.gd" id="1"]
 [ext_resource type="Script" path="res://ui/board.gd" id="2"]
+[ext_resource type="Theme" path="res://ui/gameplay_theme.tres" id="3"]
+[ext_resource type="Script" path="res://ui/flow_mark.gd" id="4"]
 
 [node name="Game" type="Control"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+anchor_right = 1
+anchor_bottom = 1
+theme = ExtResource("3")
 script = ExtResource("1")
 
-[node name="Layout" type="VBoxContainer" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 36.0
-offset_top = 46.0
-offset_right = -36.0
-offset_bottom = -46.0
-theme_override_constants/separation = 16
+[node name="Layout" type="Control" parent="."]
+anchor_right = 1
+anchor_bottom = 1
+offset_left = 48
+offset_top = 44
+offset_right = -48
+offset_bottom = -44
+mouse_filter = 2
 
-[node name="Title" type="Label" parent="Layout"]
-theme_override_font_sizes/font_size = 76
-text = "ARROW FLOW"
-horizontal_alignment = 1
+[node name="Mark" type="Control" parent="Layout"]
+offset_right = 56
+offset_bottom = 56
+mouse_filter = 2
+script = ExtResource("4")
+
+[node name="Brand" type="Label" parent="Layout"]
+offset_left = 72
+offset_right = 420
+offset_bottom = 56
+theme_override_font_sizes/font_size = 28
+theme_type_variation = &"Wordmark"
+text = "A R R O W   F L O W"
+horizontal_alignment = 0
+vertical_alignment = 1
+mouse_filter = 2
 
 [node name="Level" type="Label" parent="Layout"]
-theme_override_colors/font_color = Color(0.64,0.86,0.81,1)
-theme_override_font_sizes/font_size = 38
+anchor_right = 0.65
+offset_top = 60
+offset_bottom = 160
+theme_override_font_sizes/font_size = 76
 text = "LEVEL 1"
-horizontal_alignment = 1
+horizontal_alignment = 0
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="Tier" type="Label" parent="Layout"]
+anchor_left = 0.65
+anchor_right = 1
+offset_top = 68
+offset_bottom = 160
+theme_override_font_sizes/font_size = 43
+theme_type_variation = &"Caption"
+text = "Tutorial"
+horizontal_alignment = 2
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="Track" type="ProgressBar" parent="Layout"]
+anchor_right = 1
+offset_top = 205
+offset_right = -335
+offset_bottom = 215
+show_percentage = false
+mouse_filter = 2
+
+[node name="Count" type="Label" parent="Layout"]
+anchor_left = 1
+anchor_right = 1
+offset_left = -330
+offset_top = 175
+offset_bottom = 245
+theme_override_font_sizes/font_size = 39
+theme_type_variation = &"Caption"
+text = "0 / 8 cleared"
+horizontal_alignment = 2
+vertical_alignment = 1
+mouse_filter = 2
 
 [node name="Board" type="Control" parent="Layout"]
+anchor_right = 1
+anchor_bottom = 1
+offset_top = 265
+offset_bottom = -297
 unique_name_in_owner = true
-size_flags_vertical = 3
 script = ExtResource("2")
 
-[node name="Status" type="CenterContainer" parent="Layout"]
-custom_minimum_size = Vector2(0,72)
+[node name="Tutorial" type="Label" parent="Layout"]
+anchor_top = 1
+anchor_right = 1
+anchor_bottom = 1
+offset_top = -290
+offset_bottom = -175
+theme_override_font_sizes/font_size = 39
+theme_type_variation = &"Caption"
+text = "Tap an arrow with a clear path to the edge.\nClear every arrow to finish."
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
 
-[node name="Complete" type="Label" parent="Layout/Status"]
-unique_name_in_owner = true
-theme_override_font_sizes/font_size = 50
-text = "LEVEL COMPLETE"
-
-[node name="Next" type="Button" parent="Layout"]
-unique_name_in_owner = true
+[node name="Overlay" type="ColorRect" parent="Layout"]
+anchor_right = 1
+anchor_bottom = 1
+offset_top = 265
+offset_bottom = -297
 visible = false
-custom_minimum_size = Vector2(330,108)
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 40
+mouse_filter = 0
+color = Color(0.062745, 0.113725, 0.152941, 1)
+
+[node name="Emblem" type="Control" parent="Layout/Overlay"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -65
+offset_top = -210
+offset_right = 65
+offset_bottom = -80
+mouse_filter = 2
+script = ExtResource("4")
+
+[node name="Complete" type="Label" parent="Layout/Overlay"]
+anchor_top = 0.5
+anchor_right = 1
+anchor_bottom = 0.5
+offset_top = -60
+offset_bottom = 50
+theme_override_font_sizes/font_size = 67
+text = "LEVEL COMPLETE"
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+unique_name_in_owner = true
+
+[node name="Next" type="Button" parent="Layout/Overlay"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250
+offset_top = 100
+offset_right = 250
+offset_bottom = 260
+unique_name_in_owner = true
+theme_type_variation = &"Primary"
 text = "NEXT LEVEL"
 
 [node name="Restart" type="Button" parent="Layout"]
+anchor_left = 0.5
+anchor_top = 1
+anchor_right = 0.5
+anchor_bottom = 1
+offset_left = -235
+offset_top = -160
+offset_right = 235
 unique_name_in_owner = true
-custom_minimum_size = Vector2(330,108)
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 40
-text = "RESTART"
+text = "Restart"
