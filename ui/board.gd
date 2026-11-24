@@ -23,6 +23,7 @@ func _ready() -> void:
 	clip.add_child(ink)
 	ink.draw.connect(draw_arrows)
 
+var hinted := ""
 var flashed := ""
 var feedback: Tween
 
@@ -113,6 +114,10 @@ func draw_arrows() -> void:
 			path = motion.section(distance)
 		var color := get_theme_color("coral" if flashed == id else "mint","Flow")
 		var stroke := s * (0.165 if flashed == id else 0.138)
+		if id == hinted:
+			color = get_theme_color("gold","Flow")
+			stroke = s * 0.21
+			ink.draw_arc(center(path[0]),s*0.21,0,TAU,32,color,s*0.055,true)
 		var head := center(path[-1])
 		var axis := (head - center(path[-2])).normalized()
 		var side := axis.orthogonal()

@@ -3,7 +3,11 @@ extends SceneTree
 # The PowerShell runner owns a unique profile shared by the two processes.
 const Fixture := preload("res://tests/save_fixture.gd")
 const Store := preload("res://game/save_store.gd")
-const DIR := "res://docs/screenshots/stage_1e_1/"
+func stage_id() -> String:
+	return "1e_1"
+
+func capture_directory() -> String:
+	return "res://docs/screenshots/stage_"+stage_id()+"/"
 var store: Store
 var app
 var capture := false
@@ -29,12 +33,12 @@ func mount() -> void:
 	app.store = store
 	root.add_child(app)
 
-func snap(label: String) -> void:
+func snap(label: String, expected := Vector2i(405,720)) -> void:
 	if not capture: return
 	await settle()
 	await RenderingServer.frame_post_draw
 	var image := root.get_texture().get_image()
-	check(image.get_size()==Vector2i(405,720) and image.save_png(DIR+label+".png")==OK,label)
+	check(image.get_size()==expected and image.save_png(capture_directory()+label+".png")==OK,label)
 
 func win_tutorial() -> void:
 	app.play()
@@ -76,7 +80,7 @@ func read_phase() -> void:
 	app.open_selector()
 	check(app.cards[1].get_node("Content/Status").text=="Cleared" and not app.cards[2].disabled and app.cards[3].disabled,"restored unlocks")
 	await snap("04-relaunch-selector")
-	check(store.save(100),"completed profile fixture")
+	check(Fixture.seed_profile(store,100),"completed profile fixture")
 	mount()
 	check(app.menu.get_node("Levels").text=="Replay levels" and not app.menu.get_node("Play").visible,"restored full campaign")
 	await snap("05-completed-campaign")
@@ -109,11 +113,11 @@ func run() -> void:
 		return
 	store = Store.new(args[1])
 	capture = "--capture" in args
-	if capture: DirAccess.make_dir_recursive_absolute(DIR)
+	if capture: DirAccess.make_dir_recursive_absolute(capture_directory())
 	match args[0]:
 		"write": await write_phase()
 		"read": await read_phase()
 		"cleanup": check(Fixture.clean(store),"remove own profile")
 		_: check(false,"unknown phase")
-	print("STAGE_1E_1_PROCESS ",args[0]," PID=",OS.get_process_id()," checks=",checks," failures=",failures)
+	print("STAGE_",stage_id().to_upper(),"_PROCESS ",args[0]," PID=",OS.get_process_id()," checks=",checks," failures=",failures)
 	quit(1 if failures else 0)

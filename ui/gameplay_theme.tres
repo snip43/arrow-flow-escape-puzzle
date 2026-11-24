@@ -79,6 +79,7 @@ Primary/base_type = &"Button"
 Flow/colors/paper = Color(0.945098, 0.972549, 0.968627, 1)
 Flow/colors/muted = Color(0.670588, 0.756863, 0.768627, 1)
 Flow/colors/bg = Color(0.062745, 0.113725, 0.152941, 1)
+Flow/colors/gold = Color(1, 0.82, 0.46, 1)
 Flow/colors/mint = Color(0.654902, 0.94902, 0.866667, 1)
 Flow/colors/accent = Color(0.333333, 0.85098, 0.72549, 1)
 Flow/colors/coral = Color(1.0, 0.47451, 0.431373, 1)

@@ -58,7 +58,7 @@ func validation() -> void:
 		put(path,row(n,1))
 		check(s.restore()==n and s.notice.is_empty(),"valid endpoint")
 	put(path,row(3,Store.MAX_REVISION))
-	check(not s.save(4) and s.restore()==3,"revision limit preserves active slot")
+	check(not Fixture.seed_profile(s,4) and s.restore()==3,"revision limit preserves active slot")
 	var domain := Session.new()
 	check(domain.restore(42),"restore continuous prefix")
 	for bad in [-1,101,false,"1",0.5]:
@@ -70,7 +70,7 @@ func recovery() -> void:
 	var s := Fixture.make_store()
 	var a := s.directory.path_join(Store.SLOTS[0])
 	var b := s.directory.path_join(Store.SLOTS[1])
-	check(s.save(1) and s.save(2) and s.save(3),"three verified alternating writes")
+	check(Fixture.seed_profile(s,1) and Fixture.seed_profile(s,2) and Fixture.seed_profile(s,3),"three verified alternating writes")
 	check(s.read_slot(a).revision==3 and s.read_slot(b).revision==2,"alternating revisions")
 	put(a,"partial revision 3")
 	put(a+".tmp",row(99,100))
@@ -81,36 +81,36 @@ func recovery() -> void:
 	var archive_a := a+"."+FileAccess.get_sha256(a)+".bak"
 	var archive_b := b+"."+FileAccess.get_sha256(b)+".bak"
 	put(archive_b,"archive collision")
-	check(not s.save(1) and FileAccess.get_file_as_string(b)=="corrupt B" and FileAccess.get_file_as_string(a)=="partial revision 3","archive verification failure preserves both originals")
+	check(not Fixture.seed_profile(s,1) and FileAccess.get_file_as_string(b)=="corrupt B" and FileAccess.get_file_as_string(a)=="partial revision 3","archive verification failure preserves both originals")
 	DirAccess.remove_absolute(archive_b)
-	check(s.save(1) and FileAccess.get_file_as_string(archive_a)=="partial revision 3" and FileAccess.get_file_as_string(archive_b)=="corrupt B","first new progress archives both damaged byte streams")
+	check(Fixture.seed_profile(s,1) and FileAccess.get_file_as_string(archive_a)=="partial revision 3" and FileAccess.get_file_as_string(archive_b)=="corrupt B","first new progress archives both damaged byte streams")
 	put(a,row(8,10))
 	put(b,row(6,10))
 	check(s.restore()==6 and s.notice==Store.CONFLICT,"equal revisions choose conservative prefix")
-	check(s.save(7) and s.restore()==7 and s.inspect().revision==11,"conflict resolved on new progress")
-	var newer := '{"schema_version":2,"new_data":"keep"}'
+	check(Fixture.seed_profile(s,7) and s.restore()==7 and s.inspect().revision==11,"conflict resolved on new progress")
+	var newer := '{"schema_version":3,"new_data":"keep"}'
 	put(b,newer)
 	var old_bytes := FileAccess.get_file_as_bytes(a)
-	check(s.restore()==7 and s.notice==Store.FUTURE and not s.save(8),"future schema locks both slots")
+	check(s.restore()==7 and s.notice==Store.FUTURE and not Fixture.seed_profile(s,8),"future schema locks both slots")
 	check(FileAccess.get_file_as_bytes(a)==old_bytes and FileAccess.get_file_as_string(b)==newer,"future and previous bytes intact")
 	DirAccess.remove_absolute(a)
-	check(s.restore()==0 and s.notice==Store.FUTURE and not s.save(1),"future as only slot")
+	check(s.restore()==0 and s.notice==Store.FUTURE and not Fixture.seed_profile(s,1),"future as only slot")
 	DirAccess.remove_absolute(b)
 	check(s.restore()==0 and s.notice.is_empty(),"temp alone not a commit")
 	check(Fixture.clean(s),"clean recovery profile")
 
 func interrupted_publish() -> void:
 	var s := Fixture.make_store()
-	check(s.save(5) and s.save(6),"prepare two committed slots")
+	check(Fixture.seed_profile(s,5) and Fixture.seed_profile(s,6),"prepare two committed slots")
 	var a := s.directory.path_join(Store.SLOTS[0])
 	var b := s.directory.path_join(Store.SLOTS[1])
 	var old_a := FileAccess.get_file_as_bytes(a)
 	var old_b := FileAccess.get_file_as_bytes(b)
 	var interrupted := InterruptedStore.new(s.directory.get_file())
-	check(not interrupted.save(7) and interrupted.read_slot(a+".tmp").count==7,"unpublished staged bytes verified")
+	check(not Fixture.seed_profile(interrupted,7) and interrupted.read_slot(a+".tmp").count==7,"unpublished staged bytes verified")
 	check(FileAccess.get_file_as_bytes(a)==old_a and FileAccess.get_file_as_bytes(b)==old_b,"interrupted publication keeps both originals")
 	check(s.restore()==6 and s.inspect().revision==2,"restart ignores interrupted publication")
-	check(s.save(7) and s.restore()==7 and s.inspect().revision==3,"next retry succeeds")
+	check(Fixture.seed_profile(s,7) and s.restore()==7 and s.inspect().revision==3,"next retry succeeds")
 	check(Fixture.clean(s),"clean interruption fixture")
 
 func mount(s: Store) -> Control:
@@ -171,7 +171,7 @@ func integration() -> void:
 	check(s.inspect().revision==2,"clean resume does not write")
 	app.free()
 	for last in [20,60,99,100]:
-		check(s.save(last-1),"seed boundary fixture")
+		check(Fixture.seed_profile(s,last-1),"seed boundary fixture")
 		app = mount(Store.new(s.directory.get_file()))
 		check(app.session.next_incomplete()==last and not app.session.can_play(last+1),"restored boundary")
 		app.play()

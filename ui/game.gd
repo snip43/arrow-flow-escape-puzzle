@@ -2,6 +2,12 @@ extends Control
 
 signal completed(id: int)
 signal back_requested
+signal attempt_changed
+signal hint_requested(ticket: int)
+var blocked_moves := 0
+var used_hint := false
+var hint_ticket := -1
+var reward_ticket := -1
 
 const Model := preload("res://game/board_model.gd")
 const Level := preload("res://levels/level_1.gd")
@@ -21,6 +27,8 @@ func _ready() -> void:
 	%Restart.pressed.connect(restart)
 	%Next.pressed.connect(next_level)
 	%Back.pressed.connect(back_requested.emit)
+	%Hint.button_down.connect(func(): hint_ticket = generation)
+	%Hint.pressed.connect(request_hint)
 	resized.connect(update_safe_margins)
 	update_safe_margins()
 	restart()
@@ -39,6 +47,11 @@ func load_level(id: int) -> bool:
 		return false
 	if not model.load_level(data.size,data.paths):
 		return false
+	hint_ticket = -1
+	blocked_moves = 0
+	used_hint = false
+	board.hinted = ""
+	$Layout/Overlay/Reward.hide()
 	level_id = id
 	generation += 1
 	if animation:
@@ -55,16 +68,21 @@ func load_level(id: int) -> bool:
 	complete.text = "ALL LEVELS COMPLETE" if id == 100 else "LEVEL COMPLETE"
 	complete.visible = false
 	%Next.visible = false
+	attempt_changed.emit()
 	return true
 
 func move(id: String) -> void:
 	if board.locked or model.path_for(id).is_empty():
 		return
 	if not model.can_exit(id):
+		blocked_moves += 1
 		board.reject(id)
 		return
+	hint_ticket = -1
 	board.reset_visuals(false)
 	board.locked = true
+	board.hinted = ""
+	attempt_changed.emit()
 	board.motion = board.Motion.new(model.path_for(id), model.size)
 	board.exiting = id
 	animation = create_tween()
@@ -86,8 +104,22 @@ func finish_move(id: String, ticket: int) -> void:
 		$Layout/Tutorial.hide()
 		$Layout/Overlay.show()
 		completed.emit(level_id)
+	attempt_changed.emit()
 	if not removed:
 		push_error("Could not commit exit: " + id)
+
+func hint_candidate() -> String:
+	if not is_inside_tree() or level_id == 1 or complete.visible or board.locked or not board.hinted.is_empty() or process_mode == Node.PROCESS_MODE_DISABLED:
+		return ""
+	var ids := model.ids()
+	ids.sort()
+	for id in ids:
+		if model.can_exit(id): return id
+	return ""
+
+func request_hint() -> void:
+	hint_requested.emit(hint_ticket)
+	hint_ticket = -1
 
 func update_progress() -> void:
 	var cleared := total - model.ids().size()
@@ -99,6 +131,8 @@ func update_safe_margins() -> void:
 	preload("res://ui/safe_layout.gd").apply(self,$Layout)
 
 func leave() -> void:
+	hint_ticket = -1
+	board.hinted = ""
 	generation += 1
 	if animation:
 		animation.kill()

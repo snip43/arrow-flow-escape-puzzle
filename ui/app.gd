@@ -1,7 +1,8 @@
 extends Control
 
 const Game := preload("res://scenes/game.tscn")
-const Session := preload("res://game/campaign_session.gd")
+const Session := preload("res://game/player_profile.gd")
+const Economy := Session.Economy
 const Catalog := preload("res://levels/level_catalog.gd")
 enum Screen { MENU, LEVELS, GAME }
 
@@ -11,6 +12,7 @@ enum Screen { MENU, LEVELS, GAME }
 var session := Session.new()
 var store := preload("res://game/save_store.gd").new()
 var dirty := false
+var base_snapshot := {}
 var catalog := Catalog.new()
 var cards := {}
 var screen := Screen.MENU
@@ -27,7 +29,9 @@ func _ready() -> void:
 	selector.get_node("Back").pressed.connect(button_back)
 	resized.connect(update_margins)
 	update_margins()
-	session.restore(store.restore())
+	store.restore()
+	base_snapshot = store.last_snapshot.duplicate()
+	session.restore_profile(base_snapshot)
 	show_menu()
 
 func update_margins() -> void:
@@ -148,6 +152,8 @@ func open_level(id: int) -> bool:
 	game = Game.instantiate()
 	game.catalog = catalog
 	game.level_id = id
+	game.attempt_changed.connect(update_notice)
+	game.hint_requested.connect(buy_hint.bind(game))
 	game.completed.connect(level_completed.bind(game))
 	game.back_requested.connect(button_back)
 	game.allow_next = allow_next
@@ -162,26 +168,66 @@ func allow_next(id: int) -> bool:
 	return screen == Screen.GAME and not cancel_activation and session.can_play(id)
 
 func level_completed(id: int, source: Control) -> void:
-	if is_instance_valid(game) and source == game and source.level_id == id and source.complete.visible:
-		if session.record_completion(id):
-			dirty = true
-			retry_save()
+	if not is_instance_valid(game) or source != game or source.level_id != id or not source.complete.visible:
+		return
+	if source.reward_ticket == source.generation: return
+	source.reward_ticket = source.generation
+	var perfect: bool = source.blocked_moves == 0 and not source.used_hint
+	var reward := session.first_clear(id,perfect)
+	var receipt: Label = source.get_node("Layout/Overlay/Reward")
+	receipt.show()
+	if reward.is_empty():
+		receipt.text = "Already cleared"
+		return
+	receipt.text = "+%d Coins" % reward.base
+	if reward.bonus > 0: receipt.text += "   ·   Perfect +%d" % reward.bonus
+	dirty = true
+	retry_save()
 
 func retry_save() -> void:
 	if dirty:
-		dirty = not store.save(session.completed_count())
+		dirty = not store.save(session.completed_count(),session.coins,base_snapshot)
+		if not dirty: base_snapshot = store.last_snapshot.duplicate()
+	update_notice()
+
+func buy_hint(ticket: int, source: Control) -> void:
+	if screen != Screen.GAME or source != game or ticket != game.generation or cancel_activation:
+		return
+	if dirty or store.spending_blocked or session.coins < Economy.HINT: return
+	var id: String = game.hint_candidate()
+	if id.is_empty(): return
+	var remaining := session.coins - Economy.HINT
+	if store.save(session.completed_count(),remaining,base_snapshot):
+		base_snapshot = store.last_snapshot.duplicate()
+		session.coins = remaining
+		game.used_hint = true
+		game.board.hinted = id
+		game.board.queue_redraw()
+	elif store.notice == store.UNSAVED:
+		store.notice = "Hint not purchased. Please retry."
 	update_notice()
 
 func update_notice() -> void:
 	for panel in [menu, selector]:
+		panel.get_node("Wallet").set_balance(session.coins)
+		panel.get_node("Wallet").show()
 		panel.get_node("SaveNotice").text = store.notice
 		panel.get_node("SaveNotice").visible = not store.notice.is_empty()
 	scroll.offset_top = 336 if store.notice.is_empty() else 408
 	if is_instance_valid(game):
 		var label: Label = game.get_node("Layout/SaveNotice")
 		label.text = store.notice
-		label.visible = not store.notice.is_empty()
-		game.get_node("Layout/Brand").visible = store.notice.is_empty()
+		if store.notice.is_empty() and game.level_id > 1 and not game.complete.visible and session.coins < Economy.HINT:
+			label.text = "Not enough coins"
+		label.visible = not label.text.is_empty()
+		game.get_node("Layout/Tutorial").visible = game.level_id == 1 and not game.complete.visible and store.notice.is_empty()
+		var wallet: Label = game.get_node("Layout/Wallet")
+		wallet.set_balance(session.coins)
+		wallet.show()
+		var hint: Button = game.get_node("%Hint")
+		hint.text = "Hint · %d" % Economy.HINT
+		hint.show()
+		hint.disabled = dirty or store.spending_blocked or session.coins < Economy.HINT or game.hint_candidate().is_empty()
 
 func button_back() -> void:
 	if not cancel_activation:

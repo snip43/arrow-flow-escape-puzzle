@@ -19,3 +19,6 @@ static func clean(store: Store) -> bool:
 	for file in DirAccess.get_files_at(store.directory):
 		if DirAccess.remove_absolute(store.directory.path_join(file))!=OK: return false
 	return DirAccess.remove_absolute(store.directory)==OK
+
+static func seed_profile(store: Store, count: int, coins := Store.Economy.START) -> bool:
+	return store.save(count,coins,Store.stamp(store.inspect()))
