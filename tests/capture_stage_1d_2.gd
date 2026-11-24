@@ -24,6 +24,7 @@ func win() -> void:
 func run() -> void:
 	DirAccess.make_dir_recursive_absolute(DIR)
 	app = load(ProjectSettings.get_setting("application/run/main_scene")).instantiate()
+	app.store = preload("res://tests/save_fixture.gd").make_store()
 	root.add_child(app)
 	for dims: Vector2i in [Vector2i(360,640), Vector2i(412,915)]:
 		root.size = dims
@@ -60,4 +61,7 @@ func run() -> void:
 	await snap("08-game-hard")
 	await win()
 	await snap("10-final-victory")
+	if not preload("res://tests/save_fixture.gd").clean(app.store):
+		quit(1)
+		return
 	quit(1 if failed or app.session.completed_count()!=100 else 0)

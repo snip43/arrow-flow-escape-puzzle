@@ -9,6 +9,8 @@ enum Screen { MENU, LEVELS, GAME }
 @onready var selector: Control = $Layout/Selector
 @onready var scroll: ScrollContainer = $Layout/Selector/Scroll
 var session := Session.new()
+var store := preload("res://game/save_store.gd").new()
+var dirty := false
 var catalog := Catalog.new()
 var cards := {}
 var screen := Screen.MENU
@@ -25,12 +27,14 @@ func _ready() -> void:
 	selector.get_node("Back").pressed.connect(button_back)
 	resized.connect(update_margins)
 	update_margins()
+	session.restore(store.restore())
 	show_menu()
 
 func update_margins() -> void:
 	preload("res://ui/safe_layout.gd").apply(self,$Layout,1200)
 
 func show_menu() -> void:
+	retry_save()
 	screen = Screen.MENU
 	$Layout.show()
 	selector.hide()
@@ -57,6 +61,7 @@ func show_selector() -> void:
 	$Layout.show()
 	menu.hide()
 	selector.show()
+	retry_save()
 	if cards.is_empty():
 		build_cards()
 	selector.get_node("Progress").text = "%d / 100 completed" % session.completed_count()
@@ -150,14 +155,33 @@ func open_level(id: int) -> bool:
 	var back_button: Button = game.get_node("%Back")
 	back_button.tooltip_text = "Return to %s. An unfinished board starts over on re-entry." % ("Levels" if origin == Screen.LEVELS else "the menu")
 	back_button.show()
+	update_notice()
 	return true
 
 func allow_next(id: int) -> bool:
 	return screen == Screen.GAME and not cancel_activation and session.can_play(id)
 
 func level_completed(id: int, source: Control) -> void:
-	if source == game and source.level_id == id and source.complete.visible:
-		session.record_completion(id)
+	if is_instance_valid(game) and source == game and source.level_id == id and source.complete.visible:
+		if session.record_completion(id):
+			dirty = true
+			retry_save()
+
+func retry_save() -> void:
+	if dirty:
+		dirty = not store.save(session.completed_count())
+	update_notice()
+
+func update_notice() -> void:
+	for panel in [menu, selector]:
+		panel.get_node("SaveNotice").text = store.notice
+		panel.get_node("SaveNotice").visible = not store.notice.is_empty()
+	scroll.offset_top = 336 if store.notice.is_empty() else 408
+	if is_instance_valid(game):
+		var label: Label = game.get_node("Layout/SaveNotice")
+		label.text = store.notice
+		label.visible = not store.notice.is_empty()
+		game.get_node("Layout/Brand").visible = store.notice.is_empty()
 
 func button_back() -> void:
 	if not cancel_activation:
@@ -185,6 +209,8 @@ func system_back() -> void:
 		back()
 
 func _notification(what: int) -> void:
+	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_WM_CLOSE_REQUEST] and is_node_ready() and dirty:
+		retry_save()
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST and is_node_ready():
 		system_back()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:

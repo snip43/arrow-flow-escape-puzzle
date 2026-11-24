@@ -229,6 +229,7 @@ func boundaries() -> void:
 
 func run() -> void:
 	app = load(ProjectSettings.get_setting("application/run/main_scene")).instantiate()
+	app.store = preload("res://tests/save_fixture.gd").make_store()
 	root.add_child(app)
 	await settle()
 	await menu_routes()
@@ -236,4 +237,7 @@ func run() -> void:
 	await boundaries()
 	check(Session.new().completed_count()==0,"independent session")
 	print("STAGE 1D.2: %d checks, %d failures"%[checks,failures])
+	if not preload("res://tests/save_fixture.gd").clean(app.store):
+		quit(1)
+		return
 	quit(1 if failures else 0)

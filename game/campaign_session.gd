@@ -5,6 +5,12 @@ const LAST := 100
 # of unique completed IDs without storing separate unlock flags.
 var _cleared := 0
 
+func restore(count: Variant) -> bool:
+	if not count is int or count < 0 or count > LAST:
+		return false
+	_cleared = count
+	return true
+
 func completed_count() -> int:
 	return _cleared
 
