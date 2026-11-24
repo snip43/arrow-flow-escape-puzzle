@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://ui/game.gd" id="1"]
 [ext_resource type="Script" path="res://ui/board.gd" id="2"]
@@ -6,6 +6,8 @@
 [ext_resource type="Script" path="res://ui/flow_mark.gd" id="4"]
 
 [ext_resource type="Script" path="res://ui/coin_balance.gd" id="coins"]
+
+[ext_resource type="Script" path="res://ui/lives_hud.gd" id="lives"]
 
 [node name="Game" type="Control"]
 anchor_right = 1
@@ -218,3 +220,65 @@ theme_type_variation = &"Caption"
 horizontal_alignment = 1
 vertical_alignment = 1
 mouse_filter = 2
+
+[node name="Lives" type="Label" parent="Layout"]
+offset_top = 175
+offset_right = 286
+offset_bottom = 245
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 36
+theme_type_variation = &"Caption"
+mouse_filter = 2
+script = ExtResource("lives")
+
+[node name="Failed" type="ColorRect" parent="Layout"]
+anchor_right = 1
+anchor_bottom = 1
+offset_top = 265
+offset_bottom = -297
+visible = false
+mouse_filter = 0
+color = Color(0.062745, 0.113725, 0.152941, 0.86)
+
+[node name="Panel" type="ColorRect" parent="Layout/Failed"]
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = -414
+offset_right = 414
+offset_top = -215
+offset_bottom = 215
+mouse_filter = 0
+color = Color(0.062745, 0.113725, 0.152941, 1)
+
+[node name="Title" type="Label" parent="Layout/Failed/Panel"]
+anchor_right = 1
+offset_top = 12
+offset_bottom = 104
+text = "OUT OF LIVES"
+theme_override_font_sizes/font_size = 72
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="Description" type="Label" parent="Layout/Failed/Panel"]
+anchor_right = 1
+offset_top = 115
+offset_bottom = 191
+theme_type_variation = &"Caption"
+text = "Restart for free to try again."
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="Continue" type="Button" parent="Layout/Failed/Panel"]
+unique_name_in_owner = true
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -252
+offset_right = 252
+offset_top = 230
+offset_bottom = 390
+theme_type_variation = &"Primary"
+disabled = true

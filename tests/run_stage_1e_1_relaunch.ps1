@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$Godot,
     [switch]$Capture,
-    [ValidateSet("1e_1","1e_2a")][string]$Stage = "1e_1"
+    [ValidateSet("1e_1","1e_2a","1e_2b")][string]$Stage = "1e_1"
 )
 $ErrorActionPreference = 'Stop'
 $project = Split-Path -Parent $PSScriptRoot

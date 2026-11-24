@@ -12,6 +12,8 @@ enum Screen { MENU, LEVELS, GAME }
 var session := Session.new()
 var store := preload("res://game/save_store.gd").new()
 var dirty := false
+var suspended := false
+var unfocused := false
 var base_snapshot := {}
 var catalog := Catalog.new()
 var cards := {}
@@ -154,6 +156,7 @@ func open_level(id: int) -> bool:
 	game.level_id = id
 	game.attempt_changed.connect(update_notice)
 	game.hint_requested.connect(buy_hint.bind(game))
+	game.continue_requested.connect(buy_continue.bind(game))
 	game.completed.connect(level_completed.bind(game))
 	game.back_requested.connect(button_back)
 	game.allow_next = allow_next
@@ -190,21 +193,42 @@ func retry_save() -> void:
 		if not dirty: base_snapshot = store.last_snapshot.duplicate()
 	update_notice()
 
-func buy_hint(ticket: int, source: Control) -> void:
-	if screen != Screen.GAME or source != game or ticket != game.generation or cancel_activation:
-		return
-	if dirty or store.spending_blocked or session.coins < Economy.HINT: return
+func purchase_allowed(ticket: int, source: Variant, price: int) -> bool:
+	return (screen == Screen.GAME and is_instance_valid(source) and source == game
+		and source.is_inside_tree() and source.is_visible_in_tree() and ticket == game.generation
+		and not game.purchase_pending and not suspended and not unfocused and not cancel_activation
+		and not dirty and not store.spending_blocked and session.coins >= price)
+
+func debit(price: int, item: String) -> bool:
+	var remaining := session.coins - price
+	if not store.save(session.completed_count(),remaining,base_snapshot):
+		if store.notice == store.UNSAVED:
+			store.notice = "%s not purchased. Please retry." % item
+		return false
+	base_snapshot = store.last_snapshot.duplicate()
+	session.coins = remaining
+	return true
+
+func buy_hint(ticket: int, source: Variant) -> void:
+	if not purchase_allowed(ticket,source,Economy.HINT): return
 	var id: String = game.hint_candidate()
 	if id.is_empty(): return
-	var remaining := session.coins - Economy.HINT
-	if store.save(session.completed_count(),remaining,base_snapshot):
-		base_snapshot = store.last_snapshot.duplicate()
-		session.coins = remaining
+	game.purchase_pending = true
+	if debit(Economy.HINT,"Hint"):
 		game.used_hint = true
 		game.board.hinted = id
 		game.board.queue_redraw()
-	elif store.notice == store.UNSAVED:
-		store.notice = "Hint not purchased. Please retry."
+	game.purchase_pending = false
+	update_notice()
+
+func buy_continue(ticket: int, source: Variant) -> void:
+	if not purchase_allowed(ticket,source,Economy.CONTINUE_COST) or game.state != game.Attempt.FAILED:
+		return
+	game.purchase_pending = true
+	game.invalidate_purchase_input()
+	if debit(Economy.CONTINUE_COST,"Continue"):
+		game.resume_board()
+	game.purchase_pending = false
 	update_notice()
 
 func update_notice() -> void:
@@ -217,7 +241,9 @@ func update_notice() -> void:
 	if is_instance_valid(game):
 		var label: Label = game.get_node("Layout/SaveNotice")
 		label.text = store.notice
-		if store.notice.is_empty() and game.level_id > 1 and not game.complete.visible and session.coins < Economy.HINT:
+		var failed: bool = game.state == game.Attempt.FAILED
+		var price := Economy.CONTINUE_COST if failed else Economy.HINT
+		if store.notice.is_empty() and game.level_id > 1 and not game.complete.visible and session.coins < price:
 			label.text = "Not enough coins"
 		label.visible = not label.text.is_empty()
 		game.get_node("Layout/Tutorial").visible = game.level_id == 1 and not game.complete.visible and store.notice.is_empty()
@@ -226,14 +252,21 @@ func update_notice() -> void:
 		wallet.show()
 		var hint: Button = game.get_node("%Hint")
 		hint.text = "Hint · %d" % Economy.HINT
-		hint.show()
-		hint.disabled = dirty or store.spending_blocked or session.coins < Economy.HINT or game.hint_candidate().is_empty()
+		hint.visible = not failed
+		var blocked: bool = game.purchase_pending or suspended or unfocused or dirty or store.spending_blocked
+		var resume: Button = game.get_node("%Continue")
+		resume.disabled = not failed or blocked or session.coins < Economy.CONTINUE_COST
+		if failed:
+			var info: Label = game.get_node("Layout/Failed/Panel/Description")
+			info.text = "Restart for free to try again." if resume.disabled else "Resume this board with %d life." % Economy.CONTINUE_LIVES
+		hint.disabled = blocked or session.coins < Economy.HINT or game.hint_candidate().is_empty()
 
 func button_back() -> void:
 	if not cancel_activation:
 		back()
 
 func back() -> void:
+	if is_instance_valid(game) and game.purchase_pending: return
 	if screen == Screen.GAME:
 		game.leave()
 		game.hide()
@@ -255,6 +288,14 @@ func system_back() -> void:
 		back()
 
 func _notification(what: int) -> void:
+	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_RESUMED]:
+		suspended = what == NOTIFICATION_APPLICATION_PAUSED
+	if what in [NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_FOCUS_IN]:
+		unfocused = what == NOTIFICATION_APPLICATION_FOCUS_OUT
+	if what in [NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and is_instance_valid(game):
+		game.invalidate_purchase_input()
+	if what in [NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_RESUMED] and is_node_ready():
+		update_notice()
 	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_WM_CLOSE_REQUEST] and is_node_ready() and dirty:
 		retry_save()
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST and is_node_ready():
