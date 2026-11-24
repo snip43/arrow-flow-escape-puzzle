@@ -88,7 +88,7 @@ func recovery() -> void:
 	put(b,row(6,10))
 	check(s.restore()==6 and s.notice==Store.CONFLICT,"equal revisions choose conservative prefix")
 	check(Fixture.seed_profile(s,7) and s.restore()==7 and s.inspect().revision==11,"conflict resolved on new progress")
-	var newer := '{"schema_version":3,"new_data":"keep"}'
+	var newer := '{"schema_version":4,"new_data":"keep"}'
 	put(b,newer)
 	var old_bytes := FileAccess.get_file_as_bytes(a)
 	check(s.restore()==7 and s.notice==Store.FUTURE and not Fixture.seed_profile(s,8),"future schema locks both slots")

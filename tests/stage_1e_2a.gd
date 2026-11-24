@@ -131,12 +131,12 @@ func migration() -> void:
 	check(store.inspect().coins==30 and store.spending_blocked and store.notice==Store.REVISION_LIMIT,"final available revision can commit once")
 	mount()
 	check(app.session.coins==30 and store.spending_blocked and app.menu.get_node("SaveNotice").visible,"exhausted revisions visible on relaunch")
-	raw(b,'{"schema_version":3}')
+	raw(b,'{"schema_version":4}')
 	raw(a,legacy(3,12))
 	mount()
 	app.open_level(2)
 	buy()
-	check(store.spending_blocked and app.game.get_node("%Hint").disabled and app.session.coins==50 and FileAccess.get_file_as_string(b)=='{"schema_version":3}',"future is read-only")
+	check(store.spending_blocked and app.game.get_node("%Hint").disabled and app.session.coins==50 and FileAccess.get_file_as_string(b)=='{"schema_version":4}',"future is read-only")
 	clean()
 
 func rewards() -> void:
@@ -332,6 +332,8 @@ func faults() -> void:
 	check(app.session.coins==50 and store.inspect().coins==50 and app.game.used_hint and store.inspect().revision==2,"lost acknowledgement reconciles once")
 	var stale := Store.new(store.directory.get_file())
 	check(not stale.save(1,80,base) and store.inspect().coins==50,"stale wallet cannot overwrite debit")
+	app.game.restart()
+	block()
 	store.fault = "before"
 	finish()
 	check(app.dirty and app.session.coins==55 and app.session.completed_count()==2 and store.inspect().count==1 and store.inspect().coins==50,"dirty unified victory")
@@ -343,14 +345,14 @@ func faults() -> void:
 	store.fault = ""
 	app.back()
 	app.retry_save()
-	check(not app.dirty and store.inspect().coins==65 and store.inspect().count==3 and store.inspect().revision==3,"retry latest snapshot once")
+	check(not app.dirty and store.inspect().coins==65 and store.inspect().count==3 and store.inspect().revision==4,"retry latest snapshot once")
 	app.play()
 	store.fault = "unknown"
 	buy()
 	check(store.needs_reload and app.session.coins==65 and store.inspect().coins==35 and not app.game.used_hint,"unverifiable readback freezes purchase")
 	buy()
 	app.retry_save()
-	check(store.inspect().revision==4 and not app.game.used_hint,"ambiguous debit never retried")
+	check(store.inspect().revision==5 and not app.game.used_hint,"ambiguous debit never retried")
 	store.fault = ""
 	mount()
 	check(app.session.coins==35 and not store.spending_blocked,"relaunch reconciles published debit")
@@ -390,6 +392,7 @@ func layouts() -> void:
 		check(warning.text=="Not enough coins" and label_fits(warning) and label_fits(g.get_node("Layout/Wallet"),44),"lack of funds fits footer")
 		block()
 		check(board==g.board.get_global_rect() and g.board.hinted!="","stable board with hint and blocked feedback")
+		g.restart()
 		store.fault = "before"
 		finish()
 		var receipt: Label = g.get_node("Layout/Overlay/Reward")

@@ -2,6 +2,7 @@ extends Control
 
 signal completed(id: int)
 signal back_requested
+signal stable_changed
 signal attempt_changed
 signal hint_requested(ticket: int)
 signal continue_requested(ticket: int)
@@ -12,6 +13,9 @@ var lives := 0
 var continue_ticket := -1
 var navigation_presses := {}
 var purchase_pending := false
+var recovery_locked := false
+var before_reset: Callable
+var removed_ids := []
 var blocked_moves := 0
 var used_hint := false
 var hint_ticket := -1
@@ -63,10 +67,14 @@ func restart() -> void:
 
 func load_level(id: int) -> bool:
 	if purchase_pending or state == Attempt.LEFT: return false
+	return rebuild_level(id,true)
+
+func rebuild_level(id: int, discard_saved := false) -> bool:
 	var data := catalog.get_level(id)
 	if data.has("error"):
 		push_warning(str(data.error))
 		return false
+	if discard_saved and before_reset.is_valid() and not before_reset.call(): return false
 	if not model.load_level(data.size,data.paths):
 		return false
 	hint_ticket = -1
@@ -77,6 +85,8 @@ func load_level(id: int) -> bool:
 	$Layout/Lives.set_lives(lives)
 	$Layout/Track.offset_left = 312 if id > 1 else 0
 	$Layout/Failed.hide()
+	removed_ids.clear()
+	recovery_locked = false
 	blocked_moves = 0
 	used_hint = false
 	board.hinted = ""
@@ -101,7 +111,7 @@ func load_level(id: int) -> bool:
 	return true
 
 func move(id: String) -> void:
-	if purchase_pending or state != Attempt.ACTIVE or model.path_for(id).is_empty():
+	if purchase_pending or recovery_locked or state != Attempt.ACTIVE or model.path_for(id).is_empty():
 		return
 	if not model.can_exit(id):
 		blocked_moves += 1
@@ -115,6 +125,7 @@ func move(id: String) -> void:
 				board.hinted = ""
 				board.set_process_input(false)
 				$Layout/Failed.show()
+			stable_changed.emit()
 			attempt_changed.emit()
 		return
 	hint_ticket = -1
@@ -138,6 +149,7 @@ func finish_move(id: String, ticket: int) -> void:
 	state = Attempt.WON if complete.visible else Attempt.ACTIVE
 	%Next.visible = complete.visible and level_id < 100
 	if removed:
+		removed_ids.append(id)
 		update_progress()
 	if complete.visible:
 		board.tap.clear()
@@ -145,6 +157,8 @@ func finish_move(id: String, ticket: int) -> void:
 		$Layout/Tutorial.hide()
 		$Layout/Overlay.show()
 		completed.emit(level_id)
+	elif removed:
+		stable_changed.emit()
 	attempt_changed.emit()
 	if not removed:
 		push_error("Could not commit exit: " + id)
@@ -186,6 +200,30 @@ func resume_board() -> void:
 	$Layout/Failed.hide()
 	board.reset_visuals()
 	board.set_process_input(true)
+	attempt_changed.emit()
+
+func checkpoint(origin: String, kind: String, operation: String) -> Dictionary:
+	return {"catalog":preload("res://game/paid_checkpoint.gd").CATALOG_ID,"level":level_id,
+		"origin":origin,"kind":kind,"operation":operation,"removed":removed_ids.duplicate(),
+		"lives":lives,"errors":blocked_moves,"state":"failed" if state==Attempt.FAILED else "active",
+		"used_hint":used_hint,"hint":board.hinted}
+
+func restore_checkpoint(cp: Dictionary) -> void:
+	# The store already validated this history against the same catalogue.
+	rebuild_level(cp.level)
+	for id in cp.removed:
+		model.remove(id)
+	removed_ids = cp.removed.duplicate()
+	lives = cp.lives
+	blocked_moves = cp.errors
+	used_hint = cp.used_hint
+	board.hinted = cp.hint
+	state = Attempt.FAILED if cp.state=="failed" else Attempt.ACTIVE
+	$Layout/Failed.visible = state==Attempt.FAILED
+	board.set_process_input(state==Attempt.ACTIVE)
+	$Layout/Lives.set_lives(lives)
+	update_progress()
+	board.queue_redraw()
 	attempt_changed.emit()
 
 func update_progress() -> void:

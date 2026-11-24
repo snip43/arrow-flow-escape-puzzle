@@ -2,7 +2,8 @@ extends RefCounted
 
 const Session := preload("res://game/campaign_session.gd")
 const Economy := preload("res://game/economy.gd")
-const VERSION := 2
+const VERSION := 3
+var checkpoints := preload("res://game/paid_checkpoint.gd").new()
 const MAX_REVISION := 2147483647
 const MAX_BYTES := 16384
 const SLOTS := ["save_a.json","save_b.json"]
@@ -81,24 +82,64 @@ func read_slot(path: String) -> Dictionary:
 		return {"state":"invalid"}
 	# Dispatch future migrations here, before decoding a version-specific payload.
 	if version > VERSION: return {"state":"future"}
+	if version == VERSION:
+		return decode_v3(row,content)
 	var grammar := v1_record if version == 1 else v2_record
 	if grammar.search(content)==null or not exact_integers(content): return {"state":"invalid"}
-	if (version != 1 and version != VERSION) or not whole(row.get("revision"),1,MAX_REVISION) or not row.get("campaign") is Dictionary:
+	if (version != 1 and version != 2) or not whole(row.get("revision"),1,MAX_REVISION) or not row.get("campaign") is Dictionary:
 		return {"state":"invalid"}
 	var count = row.campaign.get("completed_count")
 	if not whole(count,0,Session.LAST): return {"state":"invalid"}
 	var balance = Economy.START
-	if version == VERSION:
+	if version == 2:
 		if not row.get("wallet") is Dictionary: return {"state":"invalid"}
 		balance = row.wallet.get("coins")
 		if not whole(balance,0,Economy.LIMIT): return {"state":"invalid"}
 	return {"state":"valid","count":int(count),"coins":int(balance),"revision":int(row.revision)}
+
+# Rebuild the typed document in input key order. All legal string values
+# are whitespace-free ASCII identifiers. A compact wire comparison rejects
+# duplicate keys, extra punctuation and integers rounded by the JSON parser.
+var whitespace := RegEx.create_from_string("[ \\t\\n\\r]+")
+
+func ordered_fields(source: Dictionary, typed: Dictionary) -> Dictionary:
+	var result := {}
+	if source.size()!=typed.size(): return result
+	for key in source:
+		if not typed.has(key): return {}
+		if typed[key] is Dictionary:
+			result[key] = ordered_fields(source[key],typed[key])
+		else:
+			result[key] = typed[key]
+	return result
+
+func decode_v3(row: Dictionary, content: String) -> Dictionary:
+	if not whole(row.get("revision"),1,MAX_REVISION) or not row.get("campaign") is Dictionary or not row.get("wallet") is Dictionary:
+		return {"state":"invalid"}
+	var count = row.campaign.get("completed_count")
+	var coins = row.wallet.get("coins")
+	if not whole(count,0,Session.LAST) or not whole(coins,0,Economy.LIMIT): return {"state":"invalid"}
+	var state := {"state":"valid","count":int(count),"coins":int(coins),"revision":int(row.revision)}
+	if row.has("checkpoint"):
+		if not row.checkpoint is Dictionary: return {"state":"invalid"}
+		var cp := checkpoints.decode(row.checkpoint,int(count))
+		if cp.is_empty(): return {"state":"invalid"}
+		state.checkpoint = cp
+	var ordered := ordered_fields(row,document(state))
+	if JSON.stringify(ordered,"",false)!=whitespace.sub(content,"",true): return {"state":"invalid"}
+	return state
+
+static func document(snapshot: Dictionary) -> Dictionary:
+	var row := {"schema_version":VERSION,"revision":snapshot.revision,"campaign":{"completed_count":int(snapshot.count)},"wallet":{"coins":int(snapshot.coins)}}
+	if snapshot.has("checkpoint"): row.checkpoint = snapshot.checkpoint
+	return row
 
 func inspect() -> Dictionary:
 	var active := -1
 	var count := 0
 	var revision := 0
 	var coins := Economy.START
+	var checkpoint := {}
 	var blocked := ""
 	var invalid := []
 	var conflict := false
@@ -110,7 +151,7 @@ func inspect() -> Dictionary:
 				if blocked.is_empty(): blocked = IO_ERROR
 			"invalid": invalid.append(i)
 			"valid":
-				if slot.revision == revision and (slot.count != count or slot.coins != coins):
+				if slot.revision == revision and (slot.count != count or slot.coins != coins or slot.get("checkpoint",{}) != checkpoint):
 					conflict = true
 				var lower: bool = slot.count < count or (slot.count == count and slot.coins < coins)
 				if slot.revision > revision or (slot.revision == revision and lower):
@@ -118,11 +159,16 @@ func inspect() -> Dictionary:
 					revision = slot.revision
 					count = slot.count
 					coins = slot.coins
-	return {"coins":coins,"active":active,"revision":revision,"count":count,"blocked":blocked,
+					checkpoint = slot.get("checkpoint",{})
+	var result := {"coins":coins,"active":active,"revision":revision,"count":count,"blocked":blocked,
 		"invalid":invalid,"conflict":conflict}
+	if not checkpoint.is_empty(): result.checkpoint = checkpoint
+	return result
 
 static func stamp(state: Dictionary) -> Dictionary:
-	return {"revision":state.revision,"count":state.count,"coins":state.coins}
+	var result := {"revision":state.revision,"count":state.count,"coins":state.coins}
+	if state.has("checkpoint"): result.checkpoint = state.checkpoint.duplicate(true)
+	return result
 
 func restore() -> int:
 	if directory.is_empty():
@@ -132,7 +178,7 @@ func restore() -> int:
 	var state := inspect()
 	last_snapshot = stamp(state)
 	needs_reload = false
-	spending_blocked = not state.blocked.is_empty() or state.revision >= MAX_REVISION
+	spending_blocked = not state.blocked.is_empty() or state.revision >= MAX_REVISION or state.conflict or not state.invalid.is_empty()
 	notice = state.blocked
 	if notice.is_empty():
 		if state.revision >= MAX_REVISION: notice = REVISION_LIMIT
@@ -150,13 +196,13 @@ func archive(slot: int) -> bool:
 	if not FileAccess.file_exists(dst) and DirAccess.copy_absolute(src,dst)!=OK: return false
 	return FileAccess.get_sha256(dst)==digest
 
-func save(count: Variant, coins: Variant, expected_base: Dictionary) -> bool:
+func save(count: Variant, coins: Variant, expected_base: Dictionary, checkpoint := {}) -> bool:
 	if needs_reload: return false
 	notice = UNSAVED
 	if directory.is_empty() or not whole(count,0,Session.LAST) or not whole(coins,0,Economy.LIMIT): return false
 	if DirAccess.make_dir_recursive_absolute(directory)!=OK: return false
 	var state := inspect()
-	spending_blocked = not state.blocked.is_empty() or state.revision >= MAX_REVISION
+	spending_blocked = not state.blocked.is_empty() or state.revision >= MAX_REVISION or state.conflict or not state.invalid.is_empty()
 	if not state.blocked.is_empty():
 		notice = state.blocked
 		return false
@@ -166,6 +212,11 @@ func save(count: Variant, coins: Variant, expected_base: Dictionary) -> bool:
 		notice = REVISION_LIMIT
 		return false
 	if count < state.count: return false
+	# Recheck at publication: a sibling may have become unreadable or
+	# conflicting since this process restored its base.
+	if coins < state.coins and (state.conflict or not state.invalid.is_empty()):
+		notice = CONFLICT if state.conflict else FALLBACK
+		return false
 	var target := 1 if state.active == 0 else 0
 	for slot in state.invalid:
 		if not archive(slot): return false
@@ -175,11 +226,12 @@ func save(count: Variant, coins: Variant, expected_base: Dictionary) -> bool:
 	var tmp := path + ".tmp"
 	var file := FileAccess.open(tmp,FileAccess.WRITE)
 	if file == null: return false
-	file.store_string(JSON.stringify({"schema_version":VERSION,"revision":revision,"campaign":{"completed_count":int(count)},"wallet":{"coins":int(coins)}}))
+	var expected := {"state":"valid","count":int(count),"coins":int(coins),"revision":revision}
+	if not checkpoint.is_empty(): expected.checkpoint = checkpoint.duplicate(true)
+	file.store_string(JSON.stringify(document(expected)))
 	file.flush()
 	var wrote := file.get_error()==OK
 	file.close()
-	var expected := {"state":"valid","count":int(count),"coins":int(coins),"revision":revision}
 	if not wrote or read_slot(tmp)!=expected: return false
 	var renamed := publish(tmp,path)
 	# A transport/filesystem failure report alone cannot prove the debit failed.

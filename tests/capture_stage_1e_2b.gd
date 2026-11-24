@@ -42,7 +42,7 @@ func write_phase() -> void:
 	check(app.game.lives==1 and app.session.coins==45 and app.game.model.ids().size()==app.game.total-1,"same partial board resumed")
 	await snap("05-continued")
 	await finish_board()
-	check(store.inspect().count==2 and store.inspect().coins==50 and store.inspect().revision==3 and app.game.get_node("Layout/Overlay/Reward").text=="+5 Coins","paid continue then base reward")
+	check(store.inspect().count==2 and store.inspect().coins==50 and store.inspect().revision==9 and app.game.get_node("Layout/Overlay/Reward").text=="+5 Coins","paid continue then base reward")
 	await snap("08-victory-after-continue")
 	app.game.next_level()
 	await partial()
@@ -51,7 +51,7 @@ func write_phase() -> void:
 
 func read_phase() -> void:
 	mount()
-	check(app.session.completed_count()==2 and app.session.coins==50 and store.inspect().revision==3,"relaunch exact durable state")
+	check(app.session.completed_count()==2 and app.session.coins==50 and store.inspect().revision==9,"relaunch exact durable state")
 	app.play()
 	check(app.game.level_id==3 and app.game.lives==3 and app.game.total==app.game.model.ids().size(),"unfinished board starts anew")
 	await partial()
@@ -64,7 +64,7 @@ func read_phase() -> void:
 	app.back()
 	app.open_level(2)
 	await finish_board()
-	check(app.game.get_node("Layout/Overlay/Reward").text=="Already cleared" and store.inspect().coins==50 and store.inspect().revision==3,"replay keeps settled balance")
+	check(app.game.get_node("Layout/Overlay/Reward").text=="Already cleared" and store.inspect().coins==50 and store.inspect().revision==9,"replay keeps settled balance")
 	app.back()
 	check(Fixture.seed_profile(store,99,100),"dense screenshot fixture")
 	mount()

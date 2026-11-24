@@ -35,6 +35,11 @@ func _ready() -> void:
 	base_snapshot = store.last_snapshot.duplicate()
 	session.restore_profile(base_snapshot)
 	show_menu()
+	if base_snapshot.has("checkpoint"):
+		var cp: Dictionary = base_snapshot.checkpoint
+		if cp.origin=="levels": screen = Screen.LEVELS
+		enter_level(cp.level)
+		game.restore_checkpoint(cp)
 
 func update_margins() -> void:
 	preload("res://ui/safe_layout.gd").apply(self,$Layout,1200)
@@ -148,6 +153,9 @@ func card_pressed(id: int) -> void:
 func open_level(id: int) -> bool:
 	if screen == Screen.GAME or cancel_activation or not session.can_play(id):
 		return false
+	return enter_level(id)
+
+func enter_level(id: int) -> bool:
 	origin = screen
 	screen = Screen.GAME
 	$Layout.hide()
@@ -155,12 +163,14 @@ func open_level(id: int) -> bool:
 	game.catalog = catalog
 	game.level_id = id
 	game.attempt_changed.connect(update_notice)
+	game.stable_changed.connect(save_stable_attempt)
 	game.hint_requested.connect(buy_hint.bind(game))
 	game.continue_requested.connect(buy_continue.bind(game))
 	game.completed.connect(level_completed.bind(game))
 	game.back_requested.connect(button_back)
 	game.allow_next = allow_next
 	add_child(game)
+	game.before_reset = clear_attempt
 	var back_button: Button = game.get_node("%Back")
 	back_button.tooltip_text = "Return to %s. An unfinished board starts over on re-entry." % ("Levels" if origin == Screen.LEVELS else "the menu")
 	back_button.show()
@@ -176,7 +186,20 @@ func level_completed(id: int, source: Control) -> void:
 	if source.reward_ticket == source.generation: return
 	source.reward_ticket = source.generation
 	var perfect: bool = source.blocked_moves == 0 and not source.used_hint
-	var reward := session.first_clear(id,perfect)
+	var paid := base_snapshot.has("checkpoint")
+	var recipient := session
+	if paid:
+		recipient = Session.new()
+		recipient.restore_profile(base_snapshot)
+	var reward := recipient.first_clear(id,perfect)
+	if paid:
+		game.purchase_pending = true
+		var ok := commit_profile(recipient.completed_count(),recipient.coins,{})
+		game.purchase_pending = false
+		if not ok:
+			rollback_move()
+			return
+		session.restore_profile(base_snapshot)
 	var receipt: Label = source.get_node("Layout/Overlay/Reward")
 	receipt.show()
 	if reward.is_empty():
@@ -184,8 +207,9 @@ func level_completed(id: int, source: Control) -> void:
 		return
 	receipt.text = "+%d Coins" % reward.base
 	if reward.bonus > 0: receipt.text += "   ·   Perfect +%d" % reward.bonus
-	dirty = true
-	retry_save()
+	if not paid:
+		dirty = true
+		retry_save()
 
 func retry_save() -> void:
 	if dirty:
@@ -193,19 +217,53 @@ func retry_save() -> void:
 		if not dirty: base_snapshot = store.last_snapshot.duplicate()
 	update_notice()
 
+func commit_profile(count: int, coins: int, checkpoint: Dictionary) -> bool:
+	if not store.save(count,coins,base_snapshot,checkpoint): return false
+	base_snapshot = store.last_snapshot.duplicate(true)
+	return true
+
+func save_stable_attempt() -> void:
+	if not base_snapshot.has("checkpoint"): return
+	var previous: Dictionary = base_snapshot.checkpoint
+	var cp: Dictionary = game.checkpoint(previous.origin,previous.kind,previous.operation)
+	game.purchase_pending = true
+	var ok := commit_profile(session.completed_count(),session.coins,cp)
+	game.purchase_pending = false
+	if not ok: rollback_move()
+
+func rollback_move() -> void:
+	if store.notice==store.UNSAVED: store.notice = "Move not saved. Retry your move."
+	game.restore_checkpoint(base_snapshot.checkpoint)
+	game.recovery_locked = store.needs_reload
+	update_notice()
+
+func clear_attempt() -> bool:
+	if not base_snapshot.has("checkpoint"): return true
+	game.purchase_pending = true
+	var ok := commit_profile(session.completed_count(),session.coins,{})
+	game.purchase_pending = false
+	if not ok:
+		if store.notice==store.UNSAVED: store.notice = "Board still saved. Retry Back or Restart."
+		update_notice()
+	return ok
+
+func purchase_checkpoint(kind: String) -> Dictionary:
+	var operation := Crypto.new().generate_random_bytes(16).hex_encode()
+	return game.checkpoint("levels" if origin==Screen.LEVELS else "menu",kind,operation)
+
 func purchase_allowed(ticket: int, source: Variant, price: int) -> bool:
 	return (screen == Screen.GAME and is_instance_valid(source) and source == game
 		and source.is_inside_tree() and source.is_visible_in_tree() and ticket == game.generation
 		and not game.purchase_pending and not suspended and not unfocused and not cancel_activation
 		and not dirty and not store.spending_blocked and session.coins >= price)
 
-func debit(price: int, item: String) -> bool:
+func debit(price: int, item: String, checkpoint: Dictionary) -> bool:
 	var remaining := session.coins - price
-	if not store.save(session.completed_count(),remaining,base_snapshot):
+	if not commit_profile(session.completed_count(),remaining,checkpoint):
+		if store.needs_reload and base_snapshot.has("checkpoint"): game.recovery_locked = true
 		if store.notice == store.UNSAVED:
 			store.notice = "%s not purchased. Please retry." % item
 		return false
-	base_snapshot = store.last_snapshot.duplicate()
 	session.coins = remaining
 	return true
 
@@ -214,7 +272,10 @@ func buy_hint(ticket: int, source: Variant) -> void:
 	var id: String = game.hint_candidate()
 	if id.is_empty(): return
 	game.purchase_pending = true
-	if debit(Economy.HINT,"Hint"):
+	var cp := purchase_checkpoint("hint")
+	cp.used_hint = true
+	cp.hint = id
+	if debit(Economy.HINT,"Hint",cp):
 		game.used_hint = true
 		game.board.hinted = id
 		game.board.queue_redraw()
@@ -226,7 +287,11 @@ func buy_continue(ticket: int, source: Variant) -> void:
 		return
 	game.purchase_pending = true
 	game.invalidate_purchase_input()
-	if debit(Economy.CONTINUE_COST,"Continue"):
+	var cp := purchase_checkpoint("continue")
+	cp.state = "active"
+	cp.lives = Economy.CONTINUE_LIVES
+	cp.hint = ""
+	if debit(Economy.CONTINUE_COST,"Continue",cp):
 		game.resume_board()
 	game.purchase_pending = false
 	update_notice()
@@ -268,6 +333,7 @@ func button_back() -> void:
 func back() -> void:
 	if is_instance_valid(game) and game.purchase_pending: return
 	if screen == Screen.GAME:
+		if not clear_attempt(): return
 		game.leave()
 		game.hide()
 		remove_child(game)

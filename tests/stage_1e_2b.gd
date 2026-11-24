@@ -40,7 +40,7 @@ func pay() -> void:
 
 func durable(count: int, coins: int, revision: int) -> bool:
 	var state := Store.stamp(store.inspect())
-	return state=={"count":count,"coins":coins,"revision":revision}
+	return state.count==count and state.coins==coins and state.revision==revision
 
 func partial_move() -> void:
 	var g = app.game
@@ -162,35 +162,35 @@ func input_edges() -> void:
 	fail_board()
 	mouse(center,false)
 	app.buy_continue(old,g)
-	check(g.lives==0 and durable(99,170,2),"old release and ticket cannot buy in new failure")
+	check(g.lives==0 and durable(99,170,6),"old release and ticket cannot buy in new failure")
 	mouse(center,true)
 	app.notification(Node.NOTIFICATION_APPLICATION_FOCUS_OUT)
 	var out_ticket: int = g.generation
 	app.buy_continue(out_ticket,g)
 	app.notification(Node.NOTIFICATION_APPLICATION_FOCUS_IN)
 	mouse(center,false)
-	check(g.lives==0 and durable(99,170,2),"focus interrupted press")
+	check(g.lives==0 and durable(99,170,6),"focus interrupted press")
 	app.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
 	pay()
-	check(g.lives==0 and durable(99,170,2),"no payment while paused")
+	check(g.lives==0 and durable(99,170,6),"no payment while paused")
 	app.notification(Node.NOTIFICATION_APPLICATION_RESUMED)
 	await touch_button(button)
-	check(g.lives==1 and durable(99,95,3),"fresh native GUI touch after resume buys one life")
+	check(g.lives==1 and durable(99,95,7),"fresh native GUI touch after resume buys one life")
 	buy()
-	check(g.used_hint and g.board.hinted!="" and durable(99,65,4),"hint works after continue")
+	check(g.used_hint and g.board.hinted!="" and durable(99,65,8),"hint works after continue")
 	fail_board()
 	check(g.used_hint and g.board.hinted=="","second failure keeps used_hint")
 	old = g.generation
 	app.back()
 	app.play()
 	app.buy_continue(old,g)
-	check(g.state==g.Attempt.LEFT and app.game.lives==3 and durable(99,65,4),"old detached scene cannot spend")
+	check(g.state==g.Attempt.LEFT and app.game.lives==3 and durable(99,65,10),"old detached scene cannot spend")
 	await process_frame
 	await process_frame
 	check(not is_instance_valid(g),"old scene freed")
 	app.buy_continue(old,g)
 	app.buy_continue(old,null)
-	check(durable(99,65,4),"removed source ignored")
+	check(durable(99,65,10),"removed source ignored")
 	clean()
 
 func stale_ui() -> void:
@@ -214,21 +214,21 @@ func stale_ui() -> void:
 		var start := Node.NOTIFICATION_APPLICATION_FOCUS_IN if mode=="focus" else Node.NOTIFICATION_APPLICATION_RESUMED
 		app.notification(stop)
 		pay()
-		check(resume.disabled and durable(1,150,2),"no purchase while "+mode)
+		check(resume.disabled and durable(1,150,5),"no purchase while "+mode)
 		app.notification(start)
 		mouse(center,false)
 		app.buy_continue(ticket,g)
-		check(g.lives==0 and durable(1,150,2),"old release invalidated by "+mode)
+		check(g.lives==0 and durable(1,150,5),"old release invalidated by "+mode)
 	click(center)
-	check(g.lives==1 and g.blocked_moves==3 and g.used_hint and g.board.hinted=="" and durable(1,75,3),"paid continue preserves earlier hint usage")
+	check(g.lives==1 and g.blocked_moves==3 and g.used_hint and g.board.hinted=="" and durable(1,75,6),"paid continue preserves earlier hint usage")
 	fail_board()
 	mouse(center,true)
 	g.restart()
 	for i in 3: block()
 	mouse(center,false)
-	check(g.lives==0 and durable(1,75,3),"held continue cannot activate on later failure at the same screen coordinates")
+	check(g.lives==0 and durable(1,75,8),"held continue cannot activate on later failure at the same screen coordinates")
 	click(center)
-	check(g.lives==1 and durable(1,0,4),"fresh press in new attempt succeeds")
+	check(g.lives==1 and durable(1,0,9),"fresh press in new attempt succeeds")
 	clean()
 
 func prices() -> void:
@@ -254,15 +254,16 @@ func prices() -> void:
 			if balance==150:
 				fail_board()
 				app.buy_continue(old,g)
-				check(g.lives==0 and durable(1,75,2),"first command cannot pay for a second failure")
+				check(g.lives==0 and durable(1,75,3),"first command cannot pay for a second failure")
 				click(button.get_global_rect().get_center())
-				check(g.lives==1 and g.blocked_moves==4 and durable(1,0,3),"second explicit purchase")
+				check(g.lives==1 and g.blocked_moves==4 and durable(1,0,4),"second explicit purchase")
 			var before: Dictionary = Store.stamp(store.inspect())
+			var final_revision: int = before.revision+g.model.ids().size()
 			finish()
-			check(durable(2,before.coins+5,before.revision+1) and g.get_node("Layout/Overlay/Reward").text=="+5 Coins","only base after continue")
+			check(durable(2,before.coins+5,final_revision) and g.get_node("Layout/Overlay/Reward").text=="+5 Coins","only base after continue")
 			g.restart()
 			finish()
-			check(durable(2,before.coins+5,before.revision+1) and g.get_node("Layout/Overlay/Reward").text=="Already cleared","replay no reward or refund")
+			check(durable(2,before.coins+5,final_revision) and g.get_node("Layout/Overlay/Reward").text=="Already cleared","replay no reward or refund")
 		clean()
 
 func transaction_faults() -> void:
@@ -284,12 +285,12 @@ func transaction_faults() -> void:
 	fail_board()
 	store.fault = "unknown"
 	pay()
-	check(store.needs_reload and app.game.lives==0 and app.session.coins==75 and durable(1,0,3) and contents()==paths,"unreadable published state freezes spending")
+	check(store.needs_reload and app.game.lives==0 and app.session.coins==75 and durable(1,0,4) and contents()==paths,"unreadable published state freezes spending")
 	pay()
 	app.retry_save()
 	app.game.restart()
 	app.back()
-	check(durable(1,0,3) and app.screen==app.Screen.MENU,"free routes still usable without redebit")
+	check(durable(1,0,4) and app.screen==app.Screen.GAME and app.game.lives==0 and store.needs_reload,"unconfirmed abandonment stays put without redebit")
 	mount()
 	check(app.session.coins==0 and not store.needs_reload,"reload resolves frozen wallet")
 	clean()
@@ -297,7 +298,7 @@ func transaction_faults() -> void:
 		setup(1,150,true)
 		var slot := store.directory.path_join(Store.SLOTS[1])
 		match cause:
-			"future": raw(slot,'{"schema_version":3}')
+			"future": raw(slot,'{"schema_version":4}')
 			"limit": raw(slot,wallet_row(1,Store.MAX_REVISION,"150"))
 			"io": check(DirAccess.make_dir_absolute(slot)==OK,"unreadable slot")
 		mount()
