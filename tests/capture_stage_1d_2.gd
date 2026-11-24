@@ -7,12 +7,13 @@ var failed := false
 func _initialize() -> void:
 	run.call_deferred()
 
-func snap(label: String) -> void:
+func snap(label: String, expected_size := Vector2i(405,720)) -> void:
 	await process_frame
 	await process_frame
 	await RenderingServer.frame_post_draw
 	var frame := root.get_texture().get_image()
-	if frame.get_size()!=Vector2i(405,720) or frame.save_png(DIR+label+".png")!=OK:
+	if frame.get_size()!=expected_size or frame.save_png(DIR+label+".png")!=OK:
+		push_error("Capture failed: %s (viewport %s, expected %s)" % [label, frame.get_size(), expected_size])
 		failed = true
 
 func win() -> void:
@@ -24,6 +25,16 @@ func run() -> void:
 	DirAccess.make_dir_recursive_absolute(DIR)
 	app = load(ProjectSettings.get_setting("application/run/main_scene")).instantiate()
 	root.add_child(app)
+	for dims: Vector2i in [Vector2i(360,640), Vector2i(412,915)]:
+		root.size = dims
+		var suffix := "%dx%d" % [dims.x,dims.y]
+		await snap("main-"+suffix,dims)
+		app.open_selector()
+		await snap("levels-"+suffix,dims)
+		app.back()
+	if "--responsive-only" in OS.get_cmdline_user_args():
+		quit(1 if failed else 0)
+		return
 	root.size = Vector2i(405,720)
 	await snap("01-main-fresh")
 	app.open_selector()
