@@ -1,5 +1,8 @@
 extends Control
 
+signal completed(id: int)
+signal back_requested
+
 const Model := preload("res://game/board_model.gd")
 const Level := preload("res://levels/level_1.gd")
 @onready var board = %Board
@@ -9,6 +12,7 @@ const SPEED := 25.0 # cells per second
 var catalog := preload("res://levels/level_catalog.gd").new()
 var level_id := 1
 var total := 0
+var allow_next: Callable
 var generation := 0
 var animation: Tween
 
@@ -16,12 +20,13 @@ func _ready() -> void:
 	board.tapped.connect(move)
 	%Restart.pressed.connect(restart)
 	%Next.pressed.connect(next_level)
+	%Back.pressed.connect(back_requested.emit)
 	resized.connect(update_safe_margins)
 	update_safe_margins()
 	restart()
 
 func next_level() -> void:
-	if complete.visible and level_id < 100:
+	if complete.visible and level_id < 100 and (not allow_next.is_valid() or allow_next.call(level_id + 1)):
 		load_level(level_id + 1)
 
 func restart() -> void:
@@ -80,6 +85,7 @@ func finish_move(id: String, ticket: int) -> void:
 		board.set_process_input(false)
 		$Layout/Tutorial.hide()
 		$Layout/Overlay.show()
+		completed.emit(level_id)
 	if not removed:
 		push_error("Could not commit exit: " + id)
 
@@ -90,11 +96,12 @@ func update_progress() -> void:
 	$Layout/Track.value = cleared
 
 func update_safe_margins() -> void:
-	if not OS.has_feature("mobile"):
-		return
-	var safe := DisplayServer.get_display_safe_area()
-	var local := get_screen_transform().affine_inverse() * Rect2(safe)
-	$Layout.offset_left = maxf(48, local.position.x)
-	$Layout.offset_top = maxf(44, local.position.y)
-	$Layout.offset_right = -maxf(48, size.x-local.end.x)
-	$Layout.offset_bottom = -maxf(44, size.y-local.end.y)
+	preload("res://ui/safe_layout.gd").apply(self,$Layout)
+
+func leave() -> void:
+	generation += 1
+	if animation:
+		animation.kill()
+	board.reset_visuals()
+	board.set_process_input(false)
+	process_mode = Node.PROCESS_MODE_DISABLED

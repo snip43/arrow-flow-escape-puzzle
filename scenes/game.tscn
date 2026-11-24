@@ -158,3 +158,12 @@ offset_top = -160
 offset_right = 235
 unique_name_in_owner = true
 text = "Restart"
+
+[node name="Back" type="Button" parent="Layout"]
+unique_name_in_owner = true
+visible = false
+anchor_top = 1
+anchor_bottom = 1
+offset_top = -160
+offset_right = 210
+text = "Back"

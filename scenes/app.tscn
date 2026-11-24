@@ -1,0 +1,137 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://ui/app.gd" id="app"]
+[ext_resource type="Theme" path="res://ui/gameplay_theme.tres" id="theme"]
+[ext_resource type="Script" path="res://ui/flow_mark.gd" id="mark"]
+
+[node name="App" type="Control"]
+anchor_right = 1
+anchor_bottom = 1
+theme = ExtResource("theme")
+script = ExtResource("app")
+
+[node name="Layout" type="Control" parent="."]
+anchor_right = 1
+anchor_bottom = 1
+mouse_filter = 2
+
+[node name="Menu" type="Control" parent="Layout"]
+anchor_right = 1
+anchor_bottom = 1
+
+[node name="Mark" type="Control" parent="Layout/Menu"]
+anchor_top = 0.28
+anchor_bottom = 0.28
+offset_top = -140
+offset_right = 220
+offset_bottom = 80
+script = ExtResource("mark")
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Layout/Menu"]
+anchor_top = 0.28
+anchor_right = 1
+anchor_bottom = 0.28
+offset_top = 110
+offset_bottom = 280
+mouse_filter = 2
+vertical_alignment = 1
+horizontal_alignment = 0
+theme_override_font_sizes/font_size = 121
+text = "ARROW FLOW"
+
+[node name="Subtitle" type="Label" parent="Layout/Menu"]
+anchor_top = 0.28
+anchor_right = 1
+anchor_bottom = 0.28
+offset_left = 5
+offset_top = 290
+offset_bottom = 370
+mouse_filter = 2
+vertical_alignment = 1
+horizontal_alignment = 0
+theme_override_font_sizes/font_size = 54
+text = "Escape Puzzle"
+theme_type_variation = &"Caption"
+
+[node name="Progress" type="Label" parent="Layout/Menu"]
+anchor_top = 1
+anchor_right = 1
+anchor_bottom = 1
+offset_top = -588
+offset_bottom = -520
+mouse_filter = 2
+vertical_alignment = 1
+horizontal_alignment = 0
+theme_override_font_sizes/font_size = 43
+text = "0 / 100 completed"
+theme_type_variation = &"Caption"
+
+[node name="Track" type="ProgressBar" parent="Layout/Menu"]
+anchor_top = 1
+anchor_right = 1
+anchor_bottom = 1
+offset_top = -494
+offset_bottom = -484
+show_percentage = false
+mouse_filter = 2
+
+[node name="Play" type="Button" parent="Layout/Menu"]
+anchor_top = 1
+anchor_right = 1
+anchor_bottom = 1
+offset_top = -390
+offset_bottom = -218
+theme_type_variation = &"Primary"
+text = "Play · Level 1"
+
+[node name="Levels" type="Button" parent="Layout/Menu"]
+anchor_top = 1
+anchor_right = 1
+anchor_bottom = 1
+offset_top = -186
+offset_bottom = -14
+text = "Levels"
+
+[node name="Selector" type="Control" parent="Layout"]
+anchor_right = 1
+anchor_bottom = 1
+visible = false
+
+[node name="Back" type="Button" parent="Layout/Selector"]
+offset_right = 220
+offset_bottom = 160
+text = "Back"
+
+[node name="Progress" type="Label" parent="Layout/Selector"]
+anchor_left = 0.35
+anchor_right = 1
+offset_bottom = 160
+mouse_filter = 2
+vertical_alignment = 1
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 39
+text = "0 / 100 completed"
+theme_type_variation = &"Caption"
+
+[node name="Title" type="Label" parent="Layout/Selector"]
+anchor_right = 1
+offset_top = 181
+offset_bottom = 315
+mouse_filter = 2
+vertical_alignment = 1
+horizontal_alignment = 0
+theme_override_font_sizes/font_size = 84
+text = "Levels"
+
+[node name="Scroll" type="ScrollContainer" parent="Layout/Selector"]
+anchor_right = 1
+anchor_bottom = 1
+offset_top = 336
+horizontal_scroll_mode = 0
+follow_focus = true
+scroll_deadzone = 14
+
+[node name="Groups" type="VBoxContainer" parent="Layout/Selector/Scroll"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 24

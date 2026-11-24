@@ -58,11 +58,26 @@ static func decode(id: int, row: Variant) -> Dictionary:
 	return {"paths":paths,"size":size,"tier":row.tier,"seed":int(row.seed),"metrics":metrics,
 		"solution":row.solution.duplicate(),"witness":row.witness.duplicate()}
 
-func get_level(id: int) -> Dictionary:
-	if id < 1 or id > 100: return {"error":"level ID outside 1..100"}
+func entries() -> Array:
+	if not read_catalog():
+		return []
+	var result := []
+	for i in _rows.size():
+		var row = _rows[i]
+		if not row is Dictionary or row.get("level_id") != i+1 or row.get("tier") != M.TIERS[M.tier(i+1)]:
+			return []
+		result.append({"id":i+1, "tier":row.tier})
+	return result
+
+func read_catalog() -> bool:
 	if _rows.is_empty():
 		var parser := JSON.new()
 		if parser.parse(FileAccess.get_file_as_string(FILE)) != OK or not parser.data is Array or parser.data.size()!=100:
-			return {"error":"invalid level catalog"}
+			return false
 		_rows = parser.data
+	return true
+
+func get_level(id: int) -> Dictionary:
+	if id < 1 or id > 100: return {"error":"level ID outside 1..100"}
+	if not read_catalog(): return {"error":"invalid level catalog"}
 	return decode(id,_rows[id-1])
