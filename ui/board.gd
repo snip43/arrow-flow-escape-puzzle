@@ -5,19 +5,33 @@ signal tapped(id: String)
 const Tap := preload("res://game/tap_tracker.gd")
 const Model := preload("res://game/board_model.gd")
 const INK := Color("#a7f2dd")
-const DENIED := Color("#ffae83")
+const DENIED := Color("#ff796e")
 var model: Model
 var tap := Tap.new()
 var locked := false
 var exiting := ""
-var opacity := 1.0
+const Motion := preload("res://game/arrow_motion.gd")
+const HIT_RADIUS := 0.38
+const SLOP := 0.24
+var motion: Motion
+var distance := 0.0
+var clip := Control.new()
+var ink := Node2D.new()
+
+func _ready() -> void:
+	clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clip.clip_contents = true
+	add_child(clip)
+	clip.add_child(ink)
+	ink.draw.connect(draw_arrows)
+
 var flashed := ""
 var feedback: Tween
 
 func spacing() -> float:
 	return minf(size.x / (model.size.x + 0.6), size.y / (model.size.y + 0.6))
 
-func center(cell: Vector2i) -> Vector2:
+func center(cell: Vector2) -> Vector2:
 	return size * 0.5 + (Vector2(cell) + Vector2.ONE * 0.5 - Vector2(model.size) * 0.5) * spacing()
 
 func hit(pos: Vector2) -> String:
@@ -29,7 +43,7 @@ func hit(pos: Vector2) -> String:
 		for i in range(1, path.size()):
 			var closest := Geometry2D.get_closest_point_to_segment(pos, center(path[i-1]), center(path[i]))
 			distance = minf(distance, pos.distance_to(closest))
-		if distance > spacing() * 0.38:
+		if distance > spacing() * HIT_RADIUS:
 			continue
 		if is_equal_approx(distance, best):
 			winner = ""
@@ -38,10 +52,14 @@ func hit(pos: Vector2) -> String:
 			winner = id
 	return winner
 
-func _gui_input(event: InputEvent) -> void:
-	if locked or model == null:
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouse or event is InputEventScreenTouch or event is InputEventScreenDrag:
+		handle_pointer(make_input_local(event))
+
+func handle_pointer(event: InputEvent) -> void:
+	if model == null:
 		return
-	if tap.feed(event, spacing() * 0.24):
+	if tap.feed(event, spacing() * SLOP, not locked and Rect2(Vector2.ZERO, size).has_point(event.position)) and not locked:
 		var id := hit(event.position)
 		if id != "" and hit(tap.start) == id:
 			tapped.emit(id)
@@ -50,13 +68,15 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and tap:
 		tap.clear()
 
-func reset_visuals() -> void:
+func reset_visuals(reset_input := true) -> void:
 	if feedback:
 		feedback.kill()
-	tap.clear()
+	if reset_input:
+		tap.clear()
 	locked = false
 	exiting = ""
-	opacity = 1.0
+	motion = null
+	distance = 0.0
 	flashed = ""
 	queue_redraw()
 
@@ -66,11 +86,11 @@ func reject(id: String) -> void:
 	flashed = id
 	queue_redraw()
 	feedback = create_tween()
-	feedback.tween_interval(0.18)
+	feedback.tween_interval(0.22)
 	feedback.tween_callback(func(): flashed = ""; queue_redraw())
 
-func fade(value: float) -> void:
-	opacity = value
+func advance(value: float) -> void:
+	distance = value
 	queue_redraw()
 
 func _draw() -> void:
@@ -82,11 +102,18 @@ func _draw() -> void:
 	for x in model.size.x:
 		for y in model.size.y:
 			draw_circle(center(Vector2i(x,y)), s * 0.034, Color("#49616a"), true, -1, true)
+	clip.position = field.position
+	clip.size = field.size
+	ink.position = -field.position
+	ink.queue_redraw()
+
+func draw_arrows() -> void:
+	var s := spacing()
 	for id in model.ids():
-		var path := model.path_for(id)
-		var color := DENIED if flashed == id else INK
+		var path := PackedVector2Array(model.path_for(id))
 		if exiting == id:
-			color.a = opacity
+			path = motion.section(distance)
+		var color := DENIED if flashed == id else INK
 		var head := center(path[-1])
 		var axis := (head - center(path[-2])).normalized()
 		var side := axis.orthogonal()
@@ -94,8 +121,8 @@ func _draw() -> void:
 			var point := center(path[i])
 			var end := center(path[i+1])
 			if i == path.size()-2:
-				end -= axis * s * 0.13
-			draw_line(point, end, color, s * 0.13, true)
-			draw_circle(point, s * 0.065, color, true, -1, true)
+				end -= axis * minf(s * 0.13, point.distance_to(end))
+			ink.draw_line(point, end, color, s * 0.13, true)
+			ink.draw_circle(point, s * 0.065, color, true, -1, true)
 		var base := head - axis * s * 0.19
-		draw_colored_polygon(PackedVector2Array([head + axis*s*0.18, base+side*s*0.20, base-side*s*0.20]), color)
+		ink.draw_colored_polygon(PackedVector2Array([head + axis*s*0.18, base+side*s*0.20, base-side*s*0.20]), color)

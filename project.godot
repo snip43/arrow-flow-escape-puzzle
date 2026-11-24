@@ -5,6 +5,7 @@ config/name="ARROW FLOW: Escape Puzzle"
 run/main_scene="res://scenes/game.tscn"
 
 [display]
+window/handheld/orientation=1
 window/size/viewport_width=1080
 window/size/viewport_height=1920
 window/size/window_width_override=405

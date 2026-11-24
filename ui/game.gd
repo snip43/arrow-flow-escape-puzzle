@@ -5,6 +5,7 @@ const Level := preload("res://levels/level_1.gd")
 @onready var board = %Board
 @onready var complete: Label = %Complete
 var model := Model.new()
+const SPEED := 25.0 # cells per second
 var generation := 0
 var animation: Tween
 
@@ -30,16 +31,19 @@ func move(id: String) -> void:
 	if not model.can_exit(id):
 		board.reject(id)
 		return
+	board.reset_visuals(false)
 	board.locked = true
-	board.tap.clear()
+	board.motion = board.Motion.new(model.path_for(id), model.size)
 	board.exiting = id
 	animation = create_tween()
-	animation.tween_method(board.fade, 1.0, 0.0, 0.25)
+	animation.tween_method(board.advance, 0.0, board.motion.travel, board.motion.travel / SPEED)
 	animation.tween_callback(finish_move.bind(id, generation))
 
 func finish_move(id: String, ticket: int) -> void:
 	if ticket != generation or board.exiting != id:
 		return
-	model.remove(id)
-	board.reset_visuals()
-	complete.visible = model.ids().is_empty()
+	var removed := model.remove(id)
+	board.reset_visuals(false)
+	complete.visible = removed and model.ids().is_empty()
+	if not removed:
+		push_error("Could not commit exit: " + id)

@@ -48,7 +48,7 @@ func run() -> void:
 	mouse(board, at, true)
 	var drag := InputEventMouseMotion.new()
 	drag.position = at + Vector2.RIGHT*board.spacing()
-	board._gui_input(drag)
+	board.handle_pointer(drag)
 	mouse(board, at, false)
 	check(not board.locked, "drag out and back cancels")
 	mouse(board, at, true, InputEvent.DEVICE_ID_EMULATION)
@@ -60,17 +60,17 @@ func run() -> void:
 	touch.index = 1
 	touch.position = at
 	touch.pressed = true
-	board._gui_input(touch)
+	board.handle_pointer(touch)
 	check(not board.locked, "touch press waits")
 	touch.pressed = false
-	board._gui_input(touch)
+	board.handle_pointer(touch)
 	var ticket: int = game.generation
 	mouse(board, bend, true)
 	mouse(board, bend, false)
 	check(board.locked and board.exiting == "B" and game.model.ids() == original, "touch release starts one deferred removal")
 	game.get_node("%Restart").pressed.emit()
 	game.finish_move("B",ticket)
-	await create_timer(0.35).timeout
+	await wait_exit(board)
 	check(game.model.ids() == original and not board.locked and not game.complete.visible, "restart during animation rejects stale callback")
 	# Deliver the final mouse gesture through the viewport and GUI hit routing.
 	for down in [true, false]:
@@ -79,11 +79,11 @@ func run() -> void:
 		click.button_index = MOUSE_BUTTON_LEFT
 		click.pressed = down
 		root.push_input(click, true)
-	await create_timer(0.35).timeout
+	await wait_exit(board)
 	check(game.model.can_exit("A") and game.model.ids().size() == 7, "mouse release commits once")
 	for id in Level.SOLUTION.slice(1):
 		game.move(id)
-		await create_timer(0.35).timeout
+		await wait_exit(board)
 	check(game.complete.is_visible_in_tree() and game.model.ids().is_empty(), "victory after final tween")
 	game.get_node("%Restart").pressed.emit()
 	check(not game.complete.visible and game.model.ids() == original, "restart after victory")
@@ -103,4 +103,9 @@ func mouse(board: Control, at: Vector2, pressed: bool, device := 0) -> void:
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.pressed = pressed
 	event.device = device
-	board._gui_input(event)
+	board.handle_pointer(event)
+
+func wait_exit(board: Control) -> void:
+	var deadline := Time.get_ticks_msec() + 2000
+	while board.locked and Time.get_ticks_msec() < deadline:
+		await process_frame
