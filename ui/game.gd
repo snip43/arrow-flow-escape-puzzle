@@ -6,24 +6,42 @@ const Level := preload("res://levels/level_1.gd")
 @onready var complete: Label = %Complete
 var model := Model.new()
 const SPEED := 25.0 # cells per second
+var catalog := preload("res://levels/level_catalog.gd").new()
+var level_id := 1
 var generation := 0
 var animation: Tween
 
 func _ready() -> void:
 	board.tapped.connect(move)
 	%Restart.pressed.connect(restart)
+	%Next.pressed.connect(next_level)
 	restart()
 
+func next_level() -> void:
+	if complete.visible and level_id < 100:
+		load_level(level_id + 1)
+
 func restart() -> void:
+	load_level(level_id)
+
+func load_level(id: int) -> bool:
+	var data := catalog.get_level(id)
+	if data.has("error"):
+		push_warning(str(data.error))
+		return false
+	if not model.load_level(data.size,data.paths):
+		return false
+	level_id = id
 	generation += 1
 	if animation:
 		animation.kill()
 	board.reset_visuals()
 	board.model = model
-	if not model.load_level(Level.SIZE, Level.arrows()):
-		push_error("Invalid Level 1")
-		board.locked = true
+	$Layout/Level.text = "LEVEL %d · %s" % [id,data.tier.to_upper()]
+	complete.text = "ALL LEVELS COMPLETE" if id == 100 else "LEVEL COMPLETE"
 	complete.visible = false
+	%Next.visible = false
+	return true
 
 func move(id: String) -> void:
 	if board.locked or model.path_for(id).is_empty():
@@ -45,5 +63,6 @@ func finish_move(id: String, ticket: int) -> void:
 	var removed := model.remove(id)
 	board.reset_visuals(false)
 	complete.visible = removed and model.ids().is_empty()
+	%Next.visible = complete.visible and level_id < 100
 	if not removed:
 		push_error("Could not commit exit: " + id)

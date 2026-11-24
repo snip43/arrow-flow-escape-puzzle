@@ -43,6 +43,14 @@ unique_name_in_owner = true
 theme_override_font_sizes/font_size = 50
 text = "LEVEL COMPLETE"
 
+[node name="Next" type="Button" parent="Layout"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(330,108)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 40
+text = "NEXT LEVEL"
+
 [node name="Restart" type="Button" parent="Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(330,108)
